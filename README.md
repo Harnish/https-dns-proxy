@@ -19,3 +19,6 @@ sslcrtpath:
 ```
 
 It currently has no logging.  Will probably add that shortly.  
+
+All the heavy lifting is done with http://github.com/miekg/dns
+
