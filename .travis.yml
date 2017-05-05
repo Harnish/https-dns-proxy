@@ -1,0 +1,9 @@
+language: go
+go:
+- 1.6
+- 1.7
+- 1.8
+script:
+- go get github.com/miekg/dns
+- go test -v ./...
+- go build -o https-dns-proxy .
