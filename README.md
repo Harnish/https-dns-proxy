@@ -22,3 +22,5 @@ It currently has no logging.  Will probably add that shortly.
 
 All the heavy lifting is done with http://github.com/miekg/dns
 
+
+Travis build status: [![Build Status](https://travis-ci.org/Harnish/https-dns-proxy.svg?branch=master)](https://travis-ci.org/Harnish/https-dns-proxy)
