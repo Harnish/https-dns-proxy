@@ -18,6 +18,24 @@ go build
 ./https-dns-proxy
 ```
 
+## Usage 
+```
+Usage of ./https-dns-proxy:
+  -conf string
+    	Location of a config file.  Will override passed in parameters
+  -dnsport string
+    	Port on the DNS server to talk to (default "53")
+  -dnsserver string
+    	DNS server you want to use as your source (default "8.8.8.8")
+  -log string
+    	Directory for log file.  Will not log if param is missing
+  -port string
+    	Port you want to listen on (default "8414")
+  -sslcrtpath string
+    	Path to SSL CRT file
+  -sslkeypath string
+    	Path to SSL Key file
+```
 
 
 ## Config file
@@ -30,9 +48,10 @@ dnsport: 53
 listenport: 8415
 sslkeypath:
 sslcrtpath:
+logpath
 ```
 
-It currently has no logging.  Will probably add that shortly.  
+If logpath is set it will create "dns-access.log" in that directory and log all requests there.
 
 All the heavy lifting is done with http://github.com/miekg/dns
 
