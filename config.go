@@ -13,11 +13,15 @@ type Config struct {
 	ListenPort string
 	SSLKeyPath string
 	SSLCrtPath string
+	LogPath    string
 }
 
 func LoadConfig(path string) *Config {
 
 	temp := new(Config)
+	if path == "" {
+		return temp
+	}
 	file, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Println("open config: ", err)

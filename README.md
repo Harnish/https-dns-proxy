@@ -8,6 +8,20 @@ You should be able to run this on a virtual instance where ever.  Or any CDN or 
 
 This is a work in progress.  I used the basic TLS webserver from Go.  PRs and updates welcome.
 
+## Building
+```
+go build
+```
+
+## Running
+```
+./https-dns-proxy
+```
+
+
+
+## Config file
+
 /etc/dnsproxy.yaml
 
 ```
@@ -24,3 +38,4 @@ All the heavy lifting is done with http://github.com/miekg/dns
 
 
 Travis build status: [![Build Status](https://travis-ci.org/Harnish/https-dns-proxy.svg?branch=master)](https://travis-ci.org/Harnish/https-dns-proxy)
+GoDoc:  [![Godoc](https://godoc.org/github.com/Harnish/https-dns-proxy?status.png)](https://godoc.org/github.com/Harnish/https-dns-proxy)
