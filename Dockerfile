@@ -1,4 +1,4 @@
-FROM golang:1.25 AS builder
+FROM golang:1.26.1 AS builder
 
 
 WORKDIR $GOPATH/src/github.com/Harnish/https-dns-proxy
