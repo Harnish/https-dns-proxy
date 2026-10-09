@@ -1,20 +1,16 @@
 FROM golang:1.27.1 AS builder
-
-
-WORKDIR $GOPATH/src/github.com/Harnish/https-dns-proxy
-ENV GO111MODULE=on
-COPY go.sum go.mod ./
+WORKDIR /src
+COPY go.mod go.sum ./
 RUN go mod download
-
-FROM builder AS server_builder
-# Here we copy the rest of the source code
-
 COPY . ./
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /app .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app .
 
-FROM scratch
-WORKDIR /root/
-
-COPY --from=server_builder ./app .
-ENTRYPOINT ["./app"]
-
+FROM alpine:3.22
+RUN adduser -D -H -u 10001 app
+COPY --from=builder /app /usr/local/bin/https-dns-proxy
+USER app
+EXPOSE 8414
+# plain-HTTP check; override with --health-cmd if running with TLS
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+  CMD wget -q --spider http://127.0.0.1:8414/query || exit 1
+ENTRYPOINT ["https-dns-proxy"]

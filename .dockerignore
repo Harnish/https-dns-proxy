@@ -1,0 +1,11 @@
+.git
+.github
+.gitignore
+.dockerignore
+Dockerfile
+README.md
+LICENSE
+nfpm.yaml
+dnsproxy.yaml
+scripts
+systemd
