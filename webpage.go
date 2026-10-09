@@ -16,7 +16,7 @@ const PageHTML = `
       if (status == 200) {
         callback(null, xhr.response);
       } else {
-        callback(status);
+        callback(status, xhr.response);
       }
     };
     xhr.send();
@@ -42,11 +42,8 @@ const PageHTML = `
 		d.textContent = '';
 		d.appendChild(a);
 		getJSON(q, function(err, data) {
-			if (err != null) {
-				alert('Something went wrong: ' + err);
-			} else {
-				document.getElementById("json").textContent = JSON.stringify(data, undefined, 2);
-			}
+			document.getElementById("json").textContent =
+				data ? JSON.stringify(data, undefined, 2) : 'HTTP error ' + err;
 		});
 	}
 	function ResolveName() {

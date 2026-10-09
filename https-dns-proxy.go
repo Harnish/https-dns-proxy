@@ -41,58 +41,80 @@ var sslcrtpath = flag.String("sslcrtpath", "", "Path to SSL CRT file")
 var loglocation = flag.String("log", "", "Directory for log file.  Will not log if param is missing")
 var configfilelocation = flag.String("conf", "", "Location of a config file.  Will override passed in parameters")
 
+func writeJSON(w http.ResponseWriter, code int, rec ResponseRecord) {
+	b, err := json.Marshal(rec)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(code)
+	w.Write(b)
+}
+
 func ResolveDNS(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	recname := req.URL.Query().Get("name")
-	rectype := req.URL.Query().Get("type")
-	//FIXME add dnssec info
-	//recdnssec := req.URL.Query().Get("dnssec")
+	q := req.URL.Query()
+	recname := q.Get("name")
+	rectype := q.Get("type")
+	dnssec := q.Get("dnssec") == "1" || q.Get("dnssec") == "true"
+	cd := q.Get("cd") == "1" || q.Get("cd") == "true"
 
-	c := new(dns.Client)
-	m := new(dns.Msg)
 	rectypeint := 255
+	fail := func(code, rcode int, comment string) {
+		writeJSON(w, code, ResponseRecord{
+			Question: QuestionRec{Name: recname, Type: rectypeint},
+			Status:   rcode,
+			Comment:  comment,
+		})
+	}
+	if recname == "" {
+		fail(http.StatusBadRequest, dns.RcodeFormatError, "missing name")
+		return
+	}
 	if rectype != "" {
 		t, err := strconv.ParseUint(rectype, 10, 16)
 		if err != nil {
-			http.Error(w, "invalid type", http.StatusBadRequest)
+			fail(http.StatusBadRequest, dns.RcodeFormatError, "invalid type")
 			return
 		}
 		rectypeint = int(t)
 	}
-	myquestion := QuestionRec{
-		Name: recname,
-		Type: rectypeint,
-	}
+
+	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(recname), uint16(rectypeint))
 	m.RecursionDesired = true
-	r, _, err := c.Exchange(m, net.JoinHostPort(config.DNSServer, config.DNSPort))
+	m.CheckingDisabled = cd
+	if dnssec {
+		m.SetEdns0(4096, true)
+	}
+	upstream := net.JoinHostPort(config.DNSServer, config.DNSPort)
+	c := new(dns.Client)
+	r, _, err := c.Exchange(m, upstream)
+	if r != nil && r.Truncated {
+		c.Net = "tcp"
+		r, _, err = c.Exchange(m, upstream)
+	}
 	if r == nil {
 		log.Printf("upstream error for %q: %v", recname, err)
-		http.Error(w, "upstream DNS error", http.StatusBadGateway)
+		fail(http.StatusBadGateway, dns.RcodeServerFailure, "upstream DNS error")
 		return
 	}
 
-	status := r.Rcode
-
-	//FIXME make all fields updated
-	responsejson := ResponseRecord{
-		AD:       false,
-		CD:       false,
+	comment := ""
+	if r.Rcode != dns.RcodeSuccess {
+		comment = dns.RcodeToString[r.Rcode]
+	}
+	writeJSON(w, http.StatusOK, ResponseRecord{
+		AD:       r.AuthenticatedData,
 		Answer:   r.Answer,
-		Question: myquestion,
-		Status:   status,
-		TC:       false,
-		RD:       true,
-		RA:       true,
-	}
-
-	jsonoutbyte, err := json.Marshal(responsejson)
-	if err != nil {
-		fmt.Println("Error")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	} else {
-		w.Write(jsonoutbyte)
-	}
+		CD:       r.CheckingDisabled,
+		Question: QuestionRec{Name: recname, Type: rectypeint},
+		RA:       r.RecursionAvailable,
+		RD:       r.RecursionDesired,
+		Status:   r.Rcode,
+		TC:       r.Truncated,
+		Comment:  comment,
+	})
 }
 
 func ResolveDNSHTML(w http.ResponseWriter, req *http.Request) {
