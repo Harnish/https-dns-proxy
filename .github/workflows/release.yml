@@ -34,6 +34,8 @@ jobs:
         run: go build -trimpath -o https-dns-proxy .
 
       - name: Install nfpm
+        env:
+          GOTOOLCHAIN: auto
         run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
 
       - name: Package deb and rpm
