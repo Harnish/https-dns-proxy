@@ -67,7 +67,7 @@ func ResolveDNS(w http.ResponseWriter, req *http.Request) {
 	m.RecursionDesired = true
 	r, _, err := c.Exchange(m, net.JoinHostPort(config.DNSServer, config.DNSPort))
 	if r == nil {
-		log.Printf("upstream error for %s: %v", recname, err)
+		log.Printf("upstream error for %q: %v", recname, err)
 		http.Error(w, "upstream DNS error", http.StatusBadGateway)
 		return
 	}
