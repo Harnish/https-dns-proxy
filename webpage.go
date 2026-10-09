@@ -3,7 +3,7 @@ package main
 const PageHTML = `
 <html lang=en>
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>HTTP(s) DNS lookup</title>
   <script language="JavaScript">
   // http://stackoverflow.com/questions/12460378/how-to-get-json-from-url-in-javascript
@@ -32,47 +32,44 @@ const PageHTML = `
     return decodeURIComponent(results[2].replace(/\+/g, " "));
 }
 
-   function ResolveName() {
+   function lookup(name, type) {
+		var q = '/resolve?name=' + encodeURIComponent(name) + '&type=' + encodeURIComponent(type);
+		var url = window.location.origin + q;
+		var a = document.createElement('a');
+		a.href = url;
+		a.textContent = url;
+		var d = document.getElementById("directurl");
+		d.textContent = '';
+		d.appendChild(a);
+		getJSON(q, function(err, data) {
+			if (err != null) {
+				alert('Something went wrong: ' + err);
+			} else {
+				document.getElementById("json").textContent = JSON.stringify(data, undefined, 2);
+			}
+		});
+	}
+	function ResolveName() {
 		var name = document.getElementById('name').value;
 		var types = document.getElementsByName('type');
-		var i;
-		var mytype = 255
-		for (i=0; i < types.length; i++){
-			if (types[i].checked == true){
+		var mytype = 255;
+		for (var i = 0; i < types.length; i++) {
+			if (types[i].checked) {
 				mytype = types[i].value;
 			}
 		}
-		var hosturl = window.location.host;
-		var protocol = window.location.protocol;
-		var prefixurl = protocol + "//" + hosturl
-		document.getElementById("directurl").innerHTML = '<a href="'+ prefixurl + '/resolve?name=' + name + '&type=' + mytype + '">' + prefixurl + '/resolve?name=' + name + '&type=' + mytype + '</a><br>';
-	   getJSON('/resolve?name=' + name,
-function(err, data) {
-  if (err != null) {
-    alert('Something went wrong: ' + err);
-  } else {
-	document.getElementById("json").innerHTML = JSON.stringify(data, undefined, 2);
-  }
-});
-}
-function loadURL() {
-	var myname = getParameterByName("name")
-	var mytype = getParameterByName("type")
-	document.getElementById("name").value = myname;
-	document.getElementById("type-" + mytype).checked = true;
-	var hosturl = window.location.host;
-    var protocol = window.location.protocol;
-    var prefixurl = protocol + "//" + hosturl
-	document.getElementById("directurl").innerHTML = '<a href="'+ prefixurl + '/resolve?name=' + myname + '&type=' + mytype + '">' + prefixurl + '/resolve?name=' + myname + '&type=' + mytype + '</a><br>';
-	getJSON('/resolve?name=' + myname + '&type=' + mytype,
-	function(err, data) {
-		if (err != null) {
-			alert('failed to query');
-		} else {
-			document.getElementById("json").innerHTML = JSON.stringify(data, undefined, 2);
+		lookup(name, mytype);
+	}
+	function loadURL() {
+		var myname = getParameterByName("name");
+		var mytype = getParameterByName("type") || "255";
+		var radio = document.getElementById("type-" + mytype);
+		if (radio) radio.checked = true;
+		if (myname) {
+			document.getElementById("name").value = myname;
+			lookup(myname, mytype);
 		}
-	})
-}
+	}
 
   </script>
 </head>
