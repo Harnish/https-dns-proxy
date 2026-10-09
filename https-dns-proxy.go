@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"time"
@@ -39,6 +40,7 @@ var dnsport = flag.String("dnsport", "53", "Port on the DNS server to talk to")
 var sslkeypath = flag.String("sslkeypath", "", "Path to SSL Key file")
 var sslcrtpath = flag.String("sslcrtpath", "", "Path to SSL CRT file")
 var loglocation = flag.String("log", "", "Directory for log file.  Will not log if param is missing")
+var allowdnsserver = flag.Bool("allow-dnsserver", false, "Let clients pick the upstream DNS server with ?dnsserver=<ip>. Public IPs only unless dnsserverallowlist is set in the config file")
 var configfilelocation = flag.String("conf", "", "Location of a config file.  Will override passed in parameters")
 
 func writeJSON(w http.ResponseWriter, code int, rec ResponseRecord) {
@@ -49,6 +51,40 @@ func writeJSON(w http.ResponseWriter, code int, rec ResponseRecord) {
 	}
 	w.WriteHeader(code)
 	w.Write(b)
+}
+
+// pickUpstream returns the DNS server IP/host to query. override is the
+// client's ?dnsserver= value; it is ignored unless AllowDNSServer is set.
+// With an allowlist (IPs or CIDRs) only listed addresses are accepted;
+// without one only public unicast IPs are, so callers can't aim the server
+// at loopback, private, or link-local hosts.
+func pickUpstream(override string) (host string, status int, msg string) {
+	if override == "" {
+		return config.DNSServer, 0, ""
+	}
+	if !config.AllowDNSServer {
+		return "", http.StatusForbidden, "dnsserver override disabled"
+	}
+	addr, err := netip.ParseAddr(override)
+	if err != nil || addr.Zone() != "" {
+		return "", http.StatusBadRequest, "invalid dnsserver (IP address required)"
+	}
+	addr = addr.Unmap()
+	if len(config.DNSServerAllowlist) > 0 {
+		for _, e := range config.DNSServerAllowlist {
+			if p, err := netip.ParsePrefix(e); err == nil && p.Contains(addr) {
+				return addr.String(), 0, ""
+			}
+			if a, err := netip.ParseAddr(e); err == nil && a.Unmap() == addr {
+				return addr.String(), 0, ""
+			}
+		}
+		return "", http.StatusForbidden, "dnsserver not in allowlist"
+	}
+	if !addr.IsGlobalUnicast() || addr.IsPrivate() {
+		return "", http.StatusForbidden, "dnsserver must be a public IP"
+	}
+	return addr.String(), 0, ""
 }
 
 func ResolveDNS(w http.ResponseWriter, req *http.Request) {
@@ -80,6 +116,12 @@ func ResolveDNS(w http.ResponseWriter, req *http.Request) {
 		rectypeint = int(t)
 	}
 
+	host, code, msg := pickUpstream(q.Get("dnsserver"))
+	if code != 0 {
+		fail(code, dns.RcodeRefused, msg)
+		return
+	}
+
 	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(recname), uint16(rectypeint))
 	m.RecursionDesired = true
@@ -87,7 +129,7 @@ func ResolveDNS(w http.ResponseWriter, req *http.Request) {
 	if dnssec {
 		m.SetEdns0(4096, true)
 	}
-	upstream := net.JoinHostPort(config.DNSServer, config.DNSPort)
+	upstream := net.JoinHostPort(host, config.DNSPort)
 	c := new(dns.Client)
 	r, _, err := c.Exchange(m, upstream)
 	if r != nil && r.Truncated {
@@ -145,6 +187,16 @@ func main() {
 	}
 	if config.DNSPort == "" {
 		config.DNSPort = *dnsport
+	}
+	if !config.AllowDNSServer {
+		config.AllowDNSServer = *allowdnsserver
+	}
+	for _, e := range config.DNSServerAllowlist {
+		_, perr := netip.ParsePrefix(e)
+		_, aerr := netip.ParseAddr(e)
+		if perr != nil && aerr != nil {
+			log.Fatalf("invalid dnsserverallowlist entry %q", e)
+		}
 	}
 	if config.LogPath == "" {
 		config.LogPath = *loglocation

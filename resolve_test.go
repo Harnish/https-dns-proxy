@@ -112,3 +112,54 @@ func TestUpstreamDown(t *testing.T) {
 		t.Errorf("got code=%d status=%d comment=%q", code, got.Status, got.Comment)
 	}
 }
+
+func TestPickUpstream(t *testing.T) {
+	tests := []struct {
+		name      string
+		allow     bool
+		allowlist []string
+		override  string
+		status    int
+		host      string
+	}{
+		{"no override", false, nil, "", 0, "cfg"},
+		{"disabled", false, nil, "8.8.8.8", 403, ""},
+		{"public ok", true, nil, "8.8.8.8", 0, "8.8.8.8"},
+		{"public v6 ok", true, nil, "2001:4860:4860::8888", 0, "2001:4860:4860::8888"},
+		{"loopback", true, nil, "127.0.0.1", 403, ""},
+		{"private", true, nil, "10.0.0.1", 403, ""},
+		{"link-local", true, nil, "169.254.169.254", 403, ""},
+		{"v4-mapped loopback", true, nil, "::ffff:127.0.0.1", 403, ""},
+		{"unspecified", true, nil, "0.0.0.0", 403, ""},
+		{"hostname", true, nil, "example.com", 400, ""},
+		{"zone", true, nil, "fe80::1%eth0", 400, ""},
+		{"allowlist cidr", true, []string{"10.0.0.0/8"}, "10.1.2.3", 0, "10.1.2.3"},
+		{"allowlist ip", true, []string{"1.1.1.1"}, "1.1.1.1", 0, "1.1.1.1"},
+		{"allowlist miss", true, []string{"1.1.1.1"}, "8.8.8.8", 403, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			config = &Config{DNSServer: "cfg", AllowDNSServer: tc.allow, DNSServerAllowlist: tc.allowlist}
+			host, status, _ := pickUpstream(tc.override)
+			if status != tc.status || host != tc.host {
+				t.Errorf("got host=%q status=%d", host, status)
+			}
+		})
+	}
+}
+
+func TestDNSServerOverrideHTTP(t *testing.T) {
+	startUpstream(t)
+	good := config.DNSServer
+	config.DNSServer = "192.0.2.1" // dead; success proves the override was used
+	config.AllowDNSServer = true
+	config.DNSServerAllowlist = []string{good}
+	code, got := query(t, "name=ok.test&type=1&dnsserver="+good)
+	if code != 200 || len(got.Answer) != 1 {
+		t.Errorf("override: code=%d answers=%d", code, len(got.Answer))
+	}
+	code, got = query(t, "name=ok.test&type=1&dnsserver=8.8.8.8")
+	if code != 403 || got.Comment == "" {
+		t.Errorf("not allowlisted: code=%d comment=%q", code, got.Comment)
+	}
+}

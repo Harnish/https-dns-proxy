@@ -14,6 +14,9 @@ type Config struct {
 	SSLKeyPath string
 	SSLCrtPath string
 	LogPath    string
+
+	AllowDNSServer     bool
+	DNSServerAllowlist []string
 }
 
 func LoadConfig(path string) *Config {
