@@ -8,9 +8,9 @@ Restart=on-failure
 DynamicUser=yes
 NoNewPrivileges=yes
 
-# Hardening. To bind a port below 1024, clear CapabilityBoundingSet and add
-# AmbientCapabilities=CAP_NET_BIND_SERVICE in a drop-in. If logpath is set in
-# /etc/dnsproxy.yaml, add ReadWritePaths=<that dir> (or use LogsDirectory=).
+# Hardening. To bind a port below 1024, set CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+# and AmbientCapabilities=CAP_NET_BIND_SERVICE in a drop-in. If logpath is set in
+# /etc/dnsproxy.yaml, add ReadWritePaths=<that dir> in a drop-in.
 CapabilityBoundingSet=
 ProtectSystem=strict
 ProtectHome=yes

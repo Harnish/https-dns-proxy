@@ -18,13 +18,38 @@ Failures come back in the same JSON shape, with the DNS rcode in `Status` and an
 
 ![NXDOMAIN result](docs/screenshots/nxdomain.png)
 
-## Building
+## Install
+
+### Linux packages (deb / rpm)
+
+Download the package for your architecture (`amd64` or `arm64`) from the [latest release](https://github.com/Harnish/https-dns-proxy/releases/latest), then:
+
 ```
-go build
+sudo apt install ./https-dns-proxy_<version>_amd64.deb     # Debian / Ubuntu
+sudo dnf install ./https-dns-proxy_<version>_amd64.rpm     # Fedora / RHEL
+sudo systemctl enable --now https-dns-proxy
 ```
 
-## Running
+This installs `/usr/bin/https-dns-proxy`, the systemd unit, and `/etc/dnsproxy.yaml` (kept across upgrades if you edit it). The service is not enabled automatically. Listens on port 8414 by default.
+
+The unit runs as a dynamic user with a locked-down sandbox (no capabilities, read-only filesystem, restricted syscalls and address families). Two settings need a drop-in (`systemctl edit https-dns-proxy`):
+
+- **Port below 1024:** add `CapabilityBoundingSet=CAP_NET_BIND_SERVICE` and `AmbientCapabilities=CAP_NET_BIND_SERVICE`.
+- **`logpath` set in the config:** add `ReadWritePaths=<that directory>`.
+
+### Docker
+
 ```
+docker run -d -p 8414:8414 ghcr.io/harnish/https-dns-proxy:latest
+docker run -d -p 8414:8414 ghcr.io/harnish/https-dns-proxy:latest -dnsserver 1.1.1.1
+```
+
+The image runs as a non-root user and its health check assumes plain HTTP on port 8414. If you use TLS or another port, override it with `--health-cmd`.
+
+### From source
+
+```
+go build
 ./https-dns-proxy
 ```
 
@@ -57,7 +82,7 @@ Usage of ./https-dns-proxy:
 ```
 dnsserver: 8.8.8.8
 dnsport: 53
-listenport: 8415
+listenport: 8414
 sslkeypath:
 sslcrtpath:
 logpath:
@@ -107,4 +132,4 @@ go test ./...
 
 All the heavy lifting is done with http://github.com/miekg/dns
 
-GoDoc:  [![Godoc](https://godoc.org/github.com/Harnish/https-dns-proxy?status.png)](https://godoc.org/github.com/Harnish/https-dns-proxy)
+GoDoc: [![Godoc](https://godoc.org/github.com/Harnish/https-dns-proxy?status.png)](https://godoc.org/github.com/Harnish/https-dns-proxy)
