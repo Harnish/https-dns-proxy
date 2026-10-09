@@ -48,13 +48,39 @@ dnsport: 53
 listenport: 8415
 sslkeypath:
 sslcrtpath:
-logpath
+logpath:
 ```
 
 If logpath is set it will create "dns-access.log" in that directory and log all requests there.
 
+## API
+
+`GET /resolve?name=<name>[&type=<n>][&dnssec=1][&cd=1]`
+
+| Param | Meaning |
+|---|---|
+| `name` | Name to look up (required) |
+| `type` | Numeric record type, e.g. `1` A, `28` AAAA, `15` MX. Default `255` (ANY) |
+| `dnssec` | `1` sets the EDNS0 DO bit; RRSIGs are included in `Answer` |
+| `cd` | `1` sets the Checking Disabled bit |
+
+```
+curl 'http://localhost:8414/resolve?name=example.com&type=1&dnssec=1'
+```
+
+The response is JSON: `Status` is the DNS rcode, `AD`/`CD`/`TC`/`RD`/`RA` come from the upstream response, and `Comment` explains failures (e.g. `NXDOMAIN`). `AD` is only meaningful if your upstream resolver validates DNSSEC. Truncated UDP answers are retried over TCP.
+
+Errors are also JSON: `400` for a missing name or invalid type, `502` if the upstream DNS server can't be reached.
+
+A human-friendly lookup page is at `/query`.
+
+**Note:** there is no authentication or rate limiting, so anyone who can reach the server can use it as a resolver.
+
+## Testing
+```
+go test ./...
+```
+
 All the heavy lifting is done with http://github.com/miekg/dns
 
-
-Travis build status: [![Build Status](https://travis-ci.org/Harnish/https-dns-proxy.svg?branch=master)](https://travis-ci.org/Harnish/https-dns-proxy)
 GoDoc:  [![Godoc](https://godoc.org/github.com/Harnish/https-dns-proxy?status.png)](https://godoc.org/github.com/Harnish/https-dns-proxy)
