@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
 
 type QuestionRec struct {
@@ -49,9 +50,14 @@ func ResolveDNS(w http.ResponseWriter, req *http.Request) {
 
 	c := new(dns.Client)
 	m := new(dns.Msg)
-	rectypeint, err := strconv.Atoi(rectype)
-	if err != nil {
-		rectypeint = 255
+	rectypeint := 255
+	if rectype != "" {
+		t, err := strconv.ParseUint(rectype, 10, 16)
+		if err != nil {
+			http.Error(w, "invalid type", http.StatusBadRequest)
+			return
+		}
+		rectypeint = int(t)
 	}
 	myquestion := QuestionRec{
 		Name: recname,
@@ -61,16 +67,12 @@ func ResolveDNS(w http.ResponseWriter, req *http.Request) {
 	m.RecursionDesired = true
 	r, _, err := c.Exchange(m, net.JoinHostPort(config.DNSServer, config.DNSPort))
 	if r == nil {
-		log.Fatalf("*** error: %s\n", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("upstream error for %s: %v", recname, err)
+		http.Error(w, "upstream DNS error", http.StatusBadGateway)
+		return
 	}
 
-	status := 0
-	if r.Rcode != dns.RcodeSuccess {
-		log.Fatalf(" *** invalid answer name %s after A query for %s\n", recname, recname)
-		status = 1
-
-	}
+	status := r.Rcode
 
 	//FIXME make all fields updated
 	responsejson := ResponseRecord{
@@ -99,7 +101,7 @@ func ResolveDNSHTML(w http.ResponseWriter, req *http.Request) {
 
 func redirect(w http.ResponseWriter, r *http.Request) {
 
-	http.Redirect(w, r, "/query", 301)
+	http.Redirect(w, r, "/query", http.StatusFound)
 }
 
 var config *Config
@@ -126,42 +128,30 @@ func main() {
 		config.LogPath = *loglocation
 	}
 
-	access_file_handler, err := os.OpenFile(config.LogPath+"/dns-access.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		fmt.Println(err)
-		config.LogPath = ""
+	var handler http.Handler = http.DefaultServeMux
+	if config.LogPath != "" {
+		f, err := os.OpenFile(config.LogPath+"/dns-access.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Println("access log disabled:", err)
+		} else {
+			handler = httpLogger.WriteLog(handler, f)
+		}
 	}
 	http.HandleFunc("/", redirect)
 	http.HandleFunc("/query", ResolveDNSHTML)
 	http.HandleFunc("/resolve", ResolveDNS)
 	fmt.Printf("Starting webserver: %+v\n", config)
-	if config.LogPath != "" {
-		if config.SSLKeyPath != "" {
-			err := http.ListenAndServeTLS(":"+config.ListenPort, config.SSLCrtPath, config.SSLKeyPath, httpLogger.WriteLog(http.DefaultServeMux, access_file_handler))
-			if err != nil {
-				log.Fatal("ListenAndServeTLS: ", err)
-			}
-		} else {
-			err := http.ListenAndServe(":"+config.ListenPort, httpLogger.WriteLog(http.DefaultServeMux, access_file_handler))
 
-			if err != nil {
-				log.Fatal("ListenAndServe: ", err)
-			}
-
-		}
-	} else {
-		if config.SSLKeyPath != "" {
-			err := http.ListenAndServeTLS(":"+config.ListenPort, config.SSLCrtPath, config.SSLKeyPath, nil)
-			if err != nil {
-				log.Fatal("ListenAndServeTLS: ", err)
-			}
-		} else {
-			err := http.ListenAndServe(":"+config.ListenPort, nil)
-
-			if err != nil {
-				log.Fatal("ListenAndServe: ", err)
-			}
-
-		}
+	srv := &http.Server{
+		Addr:              ":" + config.ListenPort,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
+	if config.SSLKeyPath != "" {
+		log.Fatal("ListenAndServeTLS: ", srv.ListenAndServeTLS(config.SSLCrtPath, config.SSLKeyPath))
+	}
+	log.Fatal("ListenAndServe: ", srv.ListenAndServe())
 }
