@@ -1,0 +1,12 @@
+[Unit]
+Description=HTTPS DNS Proxy
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/https-dns-proxy -conf /etc/dnsproxy.yaml
+Restart=on-failure
+DynamicUser=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

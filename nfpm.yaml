@@ -1,0 +1,23 @@
+name: https-dns-proxy
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+maintainer: Joseph Harnish <josephharnish@gmail.com>
+description: HTTPS DNS proxy web interface
+vendor: Harnish
+homepage: https://github.com/Harnish/https-dns-proxy
+license: MIT
+
+contents:
+  - src: ./https-dns-proxy
+    dst: /usr/bin/https-dns-proxy
+  - src: ./systemd/https-dns-proxy.service
+    dst: /usr/lib/systemd/system/https-dns-proxy.service
+  - src: ./dnsproxy.yaml
+    dst: /etc/dnsproxy.yaml
+    type: config|noreplace
+
+scripts:
+  postinstall: ./scripts/postinstall.sh

@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Set version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+        run: go build -a -installsuffix nocgo -o https-dns-proxy .
+
+      - name: Package deb
+        uses: goreleaser/nfpm-action@v1
+        env:
+          VERSION: ${{ env.VERSION }}
+          ARCH: ${{ matrix.arch }}
+        with:
+          packager: deb
+          config: nfpm.yaml
+          target: https-dns-proxy_${{ env.VERSION }}_${{ matrix.arch }}.deb
+
+      - name: Package rpm
+        uses: goreleaser/nfpm-action@v1
+        env:
+          VERSION: ${{ env.VERSION }}
+          ARCH: ${{ matrix.arch }}
+        with:
+          packager: rpm
+          config: nfpm.yaml
+          target: https-dns-proxy_${{ env.VERSION }}_${{ matrix.arch }}.rpm
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.arch }}
+          path: |
+            *.deb
+            *.rpm
+
+  release:
+    needs: packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v6
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: dist
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

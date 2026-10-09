@@ -1,0 +1,6 @@
+dnsserver: 8.8.8.8
+dnsport: 53
+listenport: 8414
+sslkeypath:
+sslcrtpath:
+logpath:
