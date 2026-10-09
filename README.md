@@ -8,6 +8,16 @@ You should be able to run this on a virtual instance where ever.  Or any CDN or 
 
 This is a work in progress.  I used the basic TLS webserver from Go.  PRs and updates welcome.
 
+## Screenshots
+
+The lookup page at `/query` resolves a name and shows the JSON answer, plus a shortcut URL for the same query:
+
+![Looking up example.com](docs/screenshots/lookup.png)
+
+Failures come back in the same JSON shape, with the DNS rcode in `Status` and an explanation in `Comment`:
+
+![NXDOMAIN result](docs/screenshots/nxdomain.png)
+
 ## Building
 ```
 go build
