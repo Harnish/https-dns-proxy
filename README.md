@@ -83,7 +83,7 @@ Errors are also JSON: `400` for a missing name or invalid type, `502` if the ups
 
 Off by default (`403`). Enable with `-allow-dnsserver` or `allowdnsserver: true`. Only IP literals are accepted (no hostnames), and the port is always the configured `dnsport`. Because this makes the server send queries to caller-chosen hosts:
 
-- with no allowlist, only public unicast IPs are accepted; loopback, private, link-local and unspecified addresses are rejected;
+- with no allowlist, only public unicast IPs are accepted; loopback, private, link-local, unspecified, carrier-grade NAT, benchmarking, documentation, reserved, and IPv6 transition (NAT64, 6to4, Teredo) addresses are rejected;
 - with `dnsserverallowlist` (IPs or CIDRs) set, only those addresses are accepted, including private ones if you list them. Prefer this on anything internet-facing.
 
 A human-friendly lookup page is at `/query`.

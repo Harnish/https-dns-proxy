@@ -53,6 +53,30 @@ func writeJSON(w http.ResponseWriter, code int, rec ResponseRecord) {
 	w.Write(b)
 }
 
+// specialUse lists ranges Go still treats as global unicast but that are not
+// ordinary public hosts: CGNAT, benchmarking, documentation, reserved, and
+// IPv6 transition prefixes that can embed internal IPv4 addresses.
+var specialUse = func() (out []netip.Prefix) {
+	for _, p := range []string{
+		"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24",
+		"192.88.99.0/24", "198.18.0.0/15", "198.51.100.0/24",
+		"203.0.113.0/24", "240.0.0.0/4",
+		"64:ff9b::/96", "64:ff9b:1::/48", "2001::/32", "2001:db8::/32", "2002::/16",
+	} {
+		out = append(out, netip.MustParsePrefix(p))
+	}
+	return
+}()
+
+func isSpecialUse(a netip.Addr) bool {
+	for _, p := range specialUse {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
+}
+
 // pickUpstream returns the DNS server IP/host to query. override is the
 // client's ?dnsserver= value; it is ignored unless AllowDNSServer is set.
 // With an allowlist (IPs or CIDRs) only listed addresses are accepted;
@@ -81,7 +105,7 @@ func pickUpstream(override string) (host string, status int, msg string) {
 		}
 		return "", http.StatusForbidden, "dnsserver not in allowlist"
 	}
-	if !addr.IsGlobalUnicast() || addr.IsPrivate() {
+	if !addr.IsGlobalUnicast() || addr.IsPrivate() || isSpecialUse(addr) {
 		return "", http.StatusForbidden, "dnsserver must be a public IP"
 	}
 	return addr.String(), 0, ""
