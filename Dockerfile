@@ -5,7 +5,7 @@ RUN go mod download
 COPY . ./
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app .
 
-FROM alpine:3.22
+FROM alpine:3.24
 RUN adduser -D -H -u 10001 app
 COPY --from=builder /app /usr/local/bin/https-dns-proxy
 USER app
